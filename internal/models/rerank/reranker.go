@@ -88,10 +88,10 @@ type RerankerConfig struct {
 
 // NewReranker creates a reranker
 func NewReranker(config *RerankerConfig) (Reranker, error) {
-	switch strings.ToLower(string(config.Source)) {
-	case string(types.ModelSourceRemote):
+	// 根据URL判断模型来源，而不是依赖Source字段
+	if strings.Contains(config.BaseURL, "https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank") {
+		return NewAliyunReranker(config)
+	} else {
 		return NewOpenAIReranker(config)
-	default:
-		return nil, fmt.Errorf("unsupported rerank model source: %s", config.Source)
 	}
 }
