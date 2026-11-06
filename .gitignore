@@ -4,6 +4,8 @@
 !.env.example
 !.gitignore
 !.github/
+# 本地编排说明文档需要入库（覆盖全局 core.excludesFile 里的 *.local.md）
+!docker-compose.local.md
 
 # 敏感文件
 *.pem
