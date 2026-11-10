@@ -5,6 +5,10 @@ on:
       - "v*"
     branches:
       - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -14,8 +18,30 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
+  check-publish:
+    name: Check Docker Hub publishing configuration
+    runs-on: ubuntu-24.04
+    outputs:
+      enabled: ${{ steps.credentials.outputs.enabled }}
+    steps:
+      # Forks do not inherit upstream secrets; skip publishing before allocating builders.
+      - name: Check Docker Hub credentials
+        id: credentials
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
+        run: |
+          if [[ -n "$DOCKERHUB_USERNAME" && -n "$DOCKERHUB_PASSWORD" ]]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo 'Docker image publishing skipped: configure both `DOCKERHUB_USERNAME` and `DOCKERHUB_PASSWORD` in repository Actions secrets to enable it.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   build-ui:
-    runs-on: ubuntu-latest
+    needs: check-publish
+    if: needs.check-publish.outputs.enabled == 'true'
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -56,7 +82,9 @@ jobs:
           cache-to: type=gha,scope=build-ui,mode=max
 
   build-docreader:
-    runs-on: ubuntu-latest
+    needs: check-publish
+    if: needs.check-publish.outputs.enabled == 'true'
+    runs-on: ubuntu-24.04
     steps:
       - name: Free Disk Space
         uses: jlumbroso/free-disk-space@main
@@ -115,7 +143,9 @@ jobs:
           cache-to: type=gha,scope=build-docreader,mode=max
 
   build-sandbox:
-    runs-on: ubuntu-latest
+    needs: check-publish
+    if: needs.check-publish.outputs.enabled == 'true'
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -214,12 +244,14 @@ jobs:
           cache-to: type=gha,scope=build-sandbox-desktop-cube,mode=max
 
   build-app:
+    needs: check-publish
+    if: needs.check-publish.outputs.enabled == 'true'
     strategy:
       matrix:
         include:
           - arch: amd64
             platform: linux/amd64
-            runs: ubuntu-latest
+            runs: ubuntu-24.04
           - arch: arm64
             platform: linux/arm64
             runs: ubuntu-24.04-arm
@@ -292,7 +324,7 @@ jobs:
           retention-days: 1
 
   merge:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs:
       - build-app
     steps:
